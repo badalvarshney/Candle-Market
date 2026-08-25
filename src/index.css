@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #FAFAF7;
+    --bg-surface: #FFFFFF;
+    --bg-cream: #FDF9F3;
+    --brand-emerald: #1B3B32;
+    --brand-emerald-dark: #122822;
+    --brand-rosewood: #8B3A2B;
+    --brand-gold: #B45309;
+    --brand-gold-dark: #92400E;
+    --brand-gold-light: #FEF3C7;
+    --text-primary: #111827;
+    --text-muted: #4B5563;
+    --border-delicate: #E8E3DA;
+    --font-heading: 'Cinzel', 'Playfair Display', serif;
+    --font-body: 'Montserrat', sans-serif;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, .font-serif {
+    font-family: var(--font-heading);
+    letter-spacing: 0.05em;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #FAFAF7;
+}
+::-webkit-scrollbar-thumb {
+  background: #B45309;
+  border-radius: 9999px;
+}
+
+/* Universal 1600px Container Standardizer */
+.container-1600, .max-w-7xl, .max-w-1600 {
+  max-width: 1600px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Buttons */
+.btn-kimirica {
+  background-color: #1B3B32;
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.85rem 2rem;
+  border-radius: 2px;
+  border: 1px solid #1B3B32;
+  cursor: pointer;
+  align-items: center;
+  gap: 0.6rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 15px rgba(27, 59, 50, 0.15);
+}
+
+.btn-kimirica:not(.hidden) {
+  display: inline-flex;
+}
+
+.btn-gold {
+  background-color: #B45309;
+  color: #FFFFFF;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.85rem 2rem;
+  border-radius: 2px;
+  border: 1px solid #B45309;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition: all 0.3s ease;
+}
+
+.btn-gold:hover {
+  background-color: #92400E;
+  transform: translateY(-2deg);
+}
+
+.btn-outline-kimirica {
+  background-color: transparent;
+  color: #111827;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.85rem 2rem;
+  border-radius: 2px;
+  border: 1px solid #111827;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-kimirica:hover {
+  background-color: #111827;
+  color: #FFFFFF;
+  border-color: #111827;
+  transform: translateY(-2deg);
+}
+
+/* Cards */
+.kimirica-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E8E3DA;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kimirica-card:hover {
+  border-color: #B45309;
+  box-shadow: 0 16px 40px -10px rgba(27, 59, 50, 0.12);
+  transform: translateY(-4deg);
+}
+
+/* Flame animation */
+@keyframes delicateFlame {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.95;
+    filter: drop-shadow(0 0 5px rgba(180, 83, 9, 0.7));
+  }
+  50% {
+    transform: scale(1.05) rotate(-1deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 9px rgba(180, 83, 9, 0.9));
+  }
+}
+
+.animate-flame-delicate {
+  animation: delicateFlame 3s infinite ease-in-out;
+}
