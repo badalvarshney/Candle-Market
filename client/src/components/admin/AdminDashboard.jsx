@@ -34,6 +34,7 @@ import {
   createCouponAPI,
   deleteCouponAPI
 } from '../../services/api';
+import AdminDesktopOnlyNotice from './AdminDesktopOnlyNotice';
 
 export default function AdminDashboard({ onLogout, onRefreshApp }) {
   const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' | 'orders' | 'drops' | 'reviews' | 'coupons'
@@ -231,7 +232,14 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
   };
 
   return (
-    <div className="bg-[#FAF7F2] min-h-screen pb-16 font-sans">
+    <>
+      {/* Mobile & Tablet Restricted Notice (< 1024px) */}
+      <div className="block lg:hidden">
+        <AdminDesktopOnlyNotice onGoHome={onLogout} />
+      </div>
+
+      {/* Laptop & Desktop Admin Control Dashboard (>= 1024px) */}
+      <div className="hidden lg:block bg-[#FAF7F2] min-h-screen pb-16 font-sans">
       
       {/* Top Header */}
       <header className="bg-[#122822] text-white border-b border-[#B45309]/50 shadow-xl sticky top-0 z-40">
@@ -946,5 +954,6 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
       )}
 
     </div>
+    </>
   );
 }

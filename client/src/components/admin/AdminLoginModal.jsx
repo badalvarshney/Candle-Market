@@ -21,7 +21,6 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
         localStorage.setItem('adminToken', data.token);
         localStorage.setItem('adminUser', JSON.stringify(data));
         onLoginSuccess(data);
-        onClose();
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Please try again.');

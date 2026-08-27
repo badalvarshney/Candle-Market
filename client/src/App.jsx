@@ -15,34 +15,48 @@ import ReviewsSection from './components/ReviewsSection';
 import Footer from './components/Footer';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminLoginModal from './components/admin/AdminLoginModal';
+import AdminDesktopOnlyNotice from './components/admin/AdminDesktopOnlyNotice';
 import Preloader from './components/Preloader';
+import NotFound from './components/NotFound';
 
 import { fetchProductsAPI } from './services/api';
 import { Flame, Heart, ArrowRight, X, ShoppingBag } from 'lucide-react';
 
-// URL Path Mapping for Browser Routing & Reload Persistence
+// Secret Admin Route Path (Public /admin returns 404 Not Found)
+export const SECRET_ADMIN_PATH = '/gargi-admin-portal';
+
 const TAB_PATH_MAP = {
   home: '/',
   shop: '/shop',
   quiz: '/quiz',
   about: '/about',
   reviews: '/reviews',
-  admin: '/admin',
+  admin: SECRET_ADMIN_PATH,
 };
 
 const getTabFromPath = (path) => {
   const clean = path.replace(/\/$/, '').toLowerCase();
+  if (clean === '' || clean === '/') return 'home';
   if (clean === '/shop') return 'shop';
   if (clean === '/quiz') return 'quiz';
   if (clean === '/about') return 'about';
   if (clean === '/reviews') return 'reviews';
-  if (clean === '/admin') return 'admin';
-  return 'home';
+  if (clean === SECRET_ADMIN_PATH.toLowerCase()) return 'admin';
+  return 'notFound'; // Returns 404 for any unmapped route including /admin
 };
 
 export default function App() {
   const [showPreloader, setShowPreloader] = useState(true);
   const [activeTab, setActiveTab] = useState(() => getTabFromPath(window.location.pathname));
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Dynamic API products dataset loaded from backend MongoDB
   const [candlesList, setCandlesList] = useState([]);
@@ -86,6 +100,11 @@ export default function App() {
     setActiveTab(tabId);
   };
 
+  // Auto Scroll to Top on Page Route / Tab Change
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [activeTab]);
+
   // Sync state on Browser Back / Forward buttons (popstate)
   useEffect(() => {
     const handlePopState = () => {
@@ -97,12 +116,23 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Check Admin permission on route change/reload
+  // Check Admin permission on route change/reload ONLY on Laptop/Desktop
   useEffect(() => {
-    if (activeTab === 'admin' && !adminUser) {
-      setIsAdminLoginOpen(true);
+    if (activeTab === 'admin') {
+      if (isDesktop) {
+        if (!adminUser) {
+          setIsAdminLoginOpen(true);
+        } else {
+          setIsAdminLoginOpen(false);
+        }
+      } else {
+        // On Mobile & Tablet screens, NEVER show login modal! Show desktop notice directly.
+        setIsAdminLoginOpen(false);
+      }
+    } else {
+      setIsAdminLoginOpen(false);
     }
-  }, [activeTab, adminUser]);
+  }, [activeTab, adminUser, isDesktop]);
 
   // Load live products from API backend
   const loadProducts = async () => {
@@ -214,7 +244,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-stone-900 selection:bg-amber-500 selection:text-white">
-      
+
       {/* Brand Preloader Animation */}
       {showPreloader && <Preloader onComplete={() => setShowPreloader(false)} />}
 
@@ -233,18 +263,22 @@ export default function App() {
 
       {/* Main Content Area depending on Active Tab */}
       <main className="flex-1">
-        
-        {/* Tab: ADMIN DASHBOARD */}
-        {activeTab === 'admin' && adminUser ? (
-          <AdminDashboard
-            onLogout={() => {
-              localStorage.removeItem('adminToken');
-              localStorage.removeItem('adminUser');
-              setAdminUser(null);
-              setActiveTab('home');
-            }}
-            onRefreshApp={loadProducts}
-          />
+
+        {/* Tab: ADMIN DASHBOARD OR DESKTOP NOTICE */}
+        {activeTab === 'admin' ? (
+          !isDesktop ? (
+            <AdminDesktopOnlyNotice onGoHome={() => navigateToTab('home')} />
+          ) : adminUser ? (
+            <AdminDashboard
+              onLogout={() => {
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('adminUser');
+                setAdminUser(null);
+                navigateToTab('home', true);
+              }}
+              onRefreshApp={loadProducts}
+            />
+          ) : null
         ) : (
           <>
             {/* Tab: HOME */}
@@ -387,6 +421,11 @@ export default function App() {
                 <ReviewsSection showAddButton={true} isSlider={false} />
               </div>
             )}
+
+            {/* 404 NOT FOUND ROUTE */}
+            {activeTab === 'notFound' && (
+              <NotFound onGoHome={() => navigateToTab('home')} />
+            )}
           </>
         )}
 
@@ -403,6 +442,7 @@ export default function App() {
         }}
         onLoginSuccess={(user) => {
           setAdminUser(user);
+          setIsAdminLoginOpen(false);
           navigateToTab('admin', true);
         }}
       />
