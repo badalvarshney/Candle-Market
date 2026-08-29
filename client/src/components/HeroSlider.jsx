@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight, Leaf, ShieldCheck, Flame, Gift } from 'lucide-react';
 import AmbientCandleOverlay from './AmbientCandleOverlay';
-import { fetchBannersAPI } from '../services/api';
+import { fetchBannersAPI, getImageUrl } from '../services/api';
 
 const DEFAULT_SLIDES = [
   {
@@ -87,7 +87,7 @@ export default function HeroSlider({ onShopNow, onOpenQuiz }) {
           >
             {/* Edge-to-Edge Background Candle Photo */}
             <img
-              src={slide.image}
+              src={getImageUrl(slide.image)}
               alt={slide.title}
               className="w-full h-full object-cover object-center transform scale-105 transition-transform duration-[10000ms] ease-out"
             />

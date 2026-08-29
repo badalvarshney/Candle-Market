@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Star, Heart, Flame, ShoppingBag, Check } from 'lucide-react';
+import { getImageUrl } from '../services/api';
 
 export default function ProductModal({
   candle,
@@ -35,7 +36,7 @@ export default function ProductModal({
         {/* Left Image */}
         <div className="md:w-1/2 relative bg-[#FAFAF7] h-52 sm:h-64 md:h-auto shrink-0">
           <img
-            src={candle.image}
+            src={getImageUrl(candle.image)}
             alt={candle.name}
             className="w-full h-full object-cover object-center"
           />

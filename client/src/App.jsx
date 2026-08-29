@@ -18,8 +18,18 @@ import AdminLoginModal from './components/admin/AdminLoginModal';
 import AdminDesktopOnlyNotice from './components/admin/AdminDesktopOnlyNotice';
 import Preloader from './components/Preloader';
 import NotFound from './components/NotFound';
+import LuxuryToast from './components/LuxuryToast';
 
-import { fetchProductsAPI } from './services/api';
+import {
+  fetchProductsAPI,
+  getImageUrl,
+  fetchWishlistAPI,
+  toggleWishlistAPI,
+  fetchCartAPI,
+  addToCartAPI,
+  updateCartQtyAPI,
+  removeFromCartAPI
+} from './services/api';
 import { Flame, Heart, ArrowRight, X, ShoppingBag } from 'lucide-react';
 
 // Secret Admin Route Path (Public /admin returns 404 Not Found)
@@ -80,6 +90,18 @@ export default function App() {
   const [cartItems, setCartItems] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
+  // Luxury Toasts state
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = ({ title, price, image, type, status, quantity = 1 }) => {
+    const id = Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    setToasts((prev) => [...prev, { id, title, price, image, type, status, quantity }]);
+  };
+
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   // Modal states
   const [selectedQuickViewCandle, setSelectedQuickViewCandle] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -134,8 +156,8 @@ export default function App() {
     }
   }, [activeTab, adminUser, isDesktop]);
 
-  // Load live products from API backend
-  const loadProducts = async () => {
+  // Load products, Wishlist & Cart from API backend
+  const loadInitialData = async () => {
     setLoadingProducts(true);
     try {
       const data = await fetchProductsAPI();
@@ -147,10 +169,39 @@ export default function App() {
     } finally {
       setLoadingProducts(false);
     }
+
+    // Fetch Wishlist from Backend API
+    fetchWishlistAPI()
+      .then((data) => {
+        if (data && data.productIds) {
+          setWishlist(data.productIds);
+        }
+      })
+      .catch((err) => console.warn('Wishlist API sync notice:', err.message));
+
+    // Fetch Cart from Backend API
+    fetchCartAPI()
+      .then((data) => {
+        if (data && Array.isArray(data)) {
+          setCartItems(
+            data.map((item) => ({
+              id: item.product?._id || item.product || item.id,
+              name: item.name,
+              price: item.price,
+              originalPrice: item.originalPrice || item.price,
+              quantity: item.quantity,
+              image: item.image,
+              waxType: item.waxType,
+              burnTime: item.burnTime,
+            }))
+          );
+        }
+      })
+      .catch((err) => console.warn('Cart API sync notice:', err.message));
   };
 
   useEffect(() => {
-    loadProducts();
+    loadInitialData();
   }, []);
 
   // Handle Tab navigation & Admin access check
@@ -165,14 +216,17 @@ export default function App() {
     navigateToTab(tabId);
   };
 
-  // Add to cart handler
-  const handleAddToCart = (candle, quantity = 1) => {
+  // Add to cart handler with Backend API Sync & Luxury Toast
+  const handleAddToCart = async (candle, quantity = 1) => {
     const candleId = candle._id || candle.id;
+    const targetIdStr = String(candleId);
+
+    // Optimistic UI update
     setCartItems((prevItems) => {
-      const existing = prevItems.find((item) => item.id === candleId);
+      const existing = prevItems.find((item) => String(item.id) === targetIdStr);
       if (existing) {
         return prevItems.map((item) =>
-          item.id === candleId ? { ...item, quantity: item.quantity + quantity } : item
+          String(item.id) === targetIdStr ? { ...item, quantity: item.quantity + quantity } : item
         );
       }
       return [
@@ -189,28 +243,84 @@ export default function App() {
         }
       ];
     });
-    setIsCartOpen(true);
+
+    // Trigger Luxury Toast
+    addToast({
+      title: candle.name,
+      price: candle.price,
+      image: candle.image,
+      type: 'cart',
+      status: 'added',
+      quantity
+    });
+
+    // Sync with Backend API
+    try {
+      await addToCartAPI(candleId, quantity);
+    } catch (err) {
+      console.warn('Backend cart sync note:', err.message);
+    }
   };
 
-  const handleUpdateQuantity = (id, newQty) => {
+  const handleUpdateQuantity = async (id, newQty) => {
     if (newQty <= 0) {
       handleRemoveFromCart(id);
       return;
     }
+    const targetIdStr = String(id);
     setCartItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, quantity: newQty } : item))
+      prev.map((item) => (String(item.id) === targetIdStr ? { ...item, quantity: newQty } : item))
     );
+
+    try {
+      await updateCartQtyAPI(id, newQty);
+    } catch (err) {
+      console.warn('Backend cart qty update note:', err.message);
+    }
   };
 
-  const handleRemoveFromCart = (id) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
+  const handleRemoveFromCart = async (id) => {
+    const targetIdStr = String(id);
+    setCartItems((prev) => prev.filter((item) => String(item.id) !== targetIdStr));
+
+    try {
+      await removeFromCartAPI(id);
+    } catch (err) {
+      console.warn('Backend cart remove note:', err.message);
+    }
   };
 
-  const handleToggleWishlist = (candle) => {
+  // Toggle Wishlist handler with Backend API Sync & Luxury Toast
+  const handleToggleWishlist = async (candle) => {
     const candleId = candle._id || candle.id;
+    const targetIdStr = String(candleId);
+    const isCurrentlyWishlisted = wishlist.map(String).includes(targetIdStr);
+
+    // Optimistic UI update
     setWishlist((prev) =>
-      prev.includes(candleId) ? prev.filter((id) => id !== candleId) : [...prev, candleId]
+      isCurrentlyWishlisted
+        ? prev.filter((id) => String(id) !== targetIdStr)
+        : [...prev, targetIdStr]
     );
+
+    // Trigger Luxury Toast
+    addToast({
+      title: candle.name,
+      price: candle.price,
+      image: candle.image,
+      type: 'wishlist',
+      status: isCurrentlyWishlisted ? 'removed' : 'added'
+    });
+
+    // Sync with Backend API
+    try {
+      const res = await toggleWishlistAPI(candleId);
+      if (res && res.data && res.data.productIds) {
+        setWishlist(res.data.productIds);
+      }
+    } catch (err) {
+      console.warn('Backend wishlist sync note:', err.message);
+    }
   };
 
   const resetFilters = () => {
@@ -389,8 +499,8 @@ export default function App() {
                           onQuickView={setSelectedQuickViewCandle}
                           onAddToCart={handleAddToCart}
                           onToggleWishlist={handleToggleWishlist}
-                          isWishlisted={wishlist.includes(cId)}
-                          isInCart={cartItems.some((item) => item.id === cId)}
+                          isWishlisted={wishlist.map(String).includes(String(cId))}
+                          isInCart={cartItems.some((item) => String(item.id) === String(cId))}
                         />
                       );
                     })}
@@ -454,8 +564,8 @@ export default function App() {
           onClose={() => setSelectedQuickViewCandle(null)}
           onAddToCart={handleAddToCart}
           onToggleWishlist={handleToggleWishlist}
-          isWishlisted={wishlist.includes(selectedQuickViewCandle._id || selectedQuickViewCandle.id)}
-          isInCart={cartItems.some((item) => item.id === (selectedQuickViewCandle._id || selectedQuickViewCandle.id))}
+          isWishlisted={wishlist.map(String).includes(String(selectedQuickViewCandle._id || selectedQuickViewCandle.id))}
+          isInCart={cartItems.some((item) => String(item.id) === String(selectedQuickViewCandle._id || selectedQuickViewCandle.id))}
         />
       )}
 
@@ -493,12 +603,12 @@ export default function App() {
               <p className="text-[#6B7280] text-xs py-8 text-center uppercase tracking-wider font-light">No candles saved in wishlist yet. Click the heart icon on any candle card!</p>
             ) : (
               <div className="space-y-3 overflow-y-auto pr-1 flex-1">
-                {candlesList.filter((c) => wishlist.includes(c._id || c.id)).map((candle) => {
+                {candlesList.filter((c) => wishlist.map(String).includes(String(c._id || c.id))).map((candle) => {
                   const cId = candle._id || candle.id;
                   return (
                     <div key={cId} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-[#FAFAF7] border border-[#E8E3DA] gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <img src={candle.image} alt={candle.name} className="w-14 h-14 object-cover shrink-0" />
+                        <img src={getImageUrl(candle.image)} alt={candle.name} className="w-14 h-14 object-cover shrink-0" />
                         <div className="min-w-0 flex-1">
                           <h4 className="font-serif font-semibold text-xs text-[#111827] uppercase tracking-wider line-clamp-1">{candle.name}</h4>
                           <span className="text-xs text-[#B45309] font-bold">₹{candle.price}</span>
@@ -528,6 +638,14 @@ export default function App() {
         cartItems={cartItems}
         pricing={checkoutPricing}
         onOrderSuccess={() => setCartItems([])}
+      />
+
+      {/* Luxury Toast Notifications */}
+      <LuxuryToast
+        toasts={toasts}
+        onCloseToast={removeToast}
+        onViewCart={() => setIsCartOpen(true)}
+        onViewWishlist={() => setIsWishlistOpen(true)}
       />
 
       {/* Footer */}

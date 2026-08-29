@@ -1,5 +1,6 @@
 import React from 'react';
 import { Heart, Eye, ShoppingBag, Star, Flame, Check } from 'lucide-react';
+import { getImageUrl } from '../services/api';
 
 export default function ProductCard({
   candle,
@@ -58,7 +59,7 @@ export default function ProductCard({
         className="relative h-64 overflow-hidden cursor-pointer bg-[#FAFAF7]"
       >
         <img
-          src={candle.image}
+          src={getImageUrl(candle.image)}
           alt={candle.name}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
         />

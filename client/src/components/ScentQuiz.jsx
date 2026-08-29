@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, RotateCcw, CheckCircle2, Flame, Moon, Sun, Wind, Home, Bed, Laptop, Bath, Shield, Layers } from 'lucide-react';
+import { getImageUrl } from '../services/api';
 
 export default function ScentQuiz({ onQuickView, onAddToCart, candlesList = [] }) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -135,7 +136,7 @@ export default function ScentQuiz({ onQuickView, onAddToCart, candlesList = [] }
 
             <div className="max-w-md mx-auto bg-[#FAFAF7] p-5 border border-[#E8E3DA] shadow-sm mb-8 flex items-center gap-4 text-left">
               <img
-                src={matchedCandle.image}
+                src={getImageUrl(matchedCandle.image)}
                 alt={matchedCandle.name}
                 className="w-24 h-24 object-cover shrink-0"
               />

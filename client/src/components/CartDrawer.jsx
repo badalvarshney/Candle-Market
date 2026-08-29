@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, ShoppingBag, ArrowRight, Flame, Tag, ShieldCheck, Check, MapPin } from 'lucide-react';
 import { calculateDeliveryCharge } from '../utils/deliveryCalculator';
+import { getImageUrl } from '../services/api';
 
 export default function CartDrawer({
   isOpen,
@@ -133,7 +134,7 @@ export default function CartDrawer({
                 >
                   <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
                     <img
-                      src={item.image}
+                      src={getImageUrl(item.image)}
                       alt={item.name}
                       className="w-14 h-14 object-cover shrink-0"
                     />

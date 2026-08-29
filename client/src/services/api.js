@@ -9,14 +9,54 @@ const api = axios.create({
   },
 });
 
-// Interceptor to add Auth JWT Token if present
+const getGuestSessionId = () => {
+  let sessionId = localStorage.getItem('guestSessionId');
+  if (!sessionId) {
+    sessionId = 'session_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+    localStorage.setItem('guestSessionId', sessionId);
+  }
+  return sessionId;
+};
+
+// Interceptor to add Auth JWT Token & Guest Session ID
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('adminToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  config.headers['x-session-id'] = getGuestSessionId();
   return config;
 });
+
+// Utility function to get full image URL (handles relative /uploads/ URLs)
+export const getImageUrl = (url) => {
+  if (!url) return '/candle_vanilla.jpg';
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:')
+  ) {
+    return url;
+  }
+  if (url.startsWith('/uploads')) {
+    // Derive server base URL from API_BASE_URL (http://localhost:5000)
+    const serverBase = API_BASE_URL.replace(/\/api$/, '');
+    return `${serverBase}${url}`;
+  }
+  return url;
+};
+
+export const uploadImageAPI = async (file) => {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.post('/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data;
+};
 
 export const fetchProductsAPI = async (params = {}) => {
   const res = await api.get('/products', { params });
@@ -38,8 +78,8 @@ export const deleteProductAPI = async (id) => {
   return res.data;
 };
 
-export const fetchBannersAPI = async () => {
-  const res = await api.get('/banners');
+export const fetchBannersAPI = async (all = false) => {
+  const res = await api.get('/banners', { params: { all } });
   return res.data.data;
 };
 
@@ -48,10 +88,16 @@ export const createBannerAPI = async (bannerData) => {
   return res.data.data;
 };
 
+export const updateBannerAPI = async (id, bannerData) => {
+  const res = await api.put(`/banners/${id}`, bannerData);
+  return res.data.data;
+};
+
 export const deleteBannerAPI = async (id) => {
   const res = await api.delete(`/banners/${id}`);
   return res.data;
 };
+
 
 export const fetchActiveDropAPI = async () => {
   const res = await api.get('/drops/active');
@@ -128,4 +174,37 @@ export const adminLoginAPI = async (email, password) => {
   return res.data.data;
 };
 
+// --- WISHLIST APIs ---
+export const fetchWishlistAPI = async () => {
+  const res = await api.get('/wishlist');
+  return res.data.data;
+};
+
+export const toggleWishlistAPI = async (productId) => {
+  const res = await api.post('/wishlist/toggle', { productId });
+  return res.data;
+};
+
+// --- CART / BAG APIs ---
+export const fetchCartAPI = async () => {
+  const res = await api.get('/cart');
+  return res.data.data;
+};
+
+export const addToCartAPI = async (productId, quantity = 1) => {
+  const res = await api.post('/cart', { productId, quantity });
+  return res.data;
+};
+
+export const updateCartQtyAPI = async (productId, quantity) => {
+  const res = await api.put(`/cart/${productId}`, { quantity });
+  return res.data.data;
+};
+
+export const removeFromCartAPI = async (productId) => {
+  const res = await api.delete(`/cart/${productId}`);
+  return res.data.data;
+};
+
 export default api;
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Flame } from 'lucide-react';
-import { fetchActiveDropAPI } from '../services/api';
+import { fetchActiveDropAPI, getImageUrl } from '../services/api';
 
 export default function UpcomingDropBanner() {
   const [dropData, setDropData] = useState({
@@ -143,7 +143,7 @@ export default function UpcomingDropBanner() {
             </div>
 
             <img
-              src={dropData.image}
+              src={getImageUrl(dropData.image)}
               alt={dropData.title}
               className="shadow-2xl object-cover h-80 sm:h-96 w-full border-2 border-[#B45309]/50 transform hover:scale-[1.02] transition-transform"
             />

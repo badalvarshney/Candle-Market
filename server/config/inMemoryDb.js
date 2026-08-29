@@ -320,5 +320,8 @@ export const inMemoryStore = {
     { _id: '1', code: 'ILLUMINATE10', discountPercent: 10, maxDiscount: 500, minPurchase: 999, isActive: true },
     { _id: '2', code: 'WELCOME10', discountPercent: 10, maxDiscount: 500, minPurchase: 999, isActive: true },
     { _id: '3', code: 'GARGI20', discountPercent: 20, maxDiscount: 1000, minPurchase: 1499, isActive: true }
-  ]
+  ],
+
+  wishlist: [],
+  cart: []
 };

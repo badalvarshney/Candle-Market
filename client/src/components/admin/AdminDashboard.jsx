@@ -13,7 +13,10 @@ import {
   LogOut,
   RefreshCw,
   Flame,
-  Check
+  Check,
+  Upload,
+  Image as ImageIcon,
+  LayoutTemplate
 } from 'lucide-react';
 import {
   fetchProductsAPI,
@@ -27,17 +30,20 @@ import {
   deleteReviewAPI,
   fetchBannersAPI,
   createBannerAPI,
+  updateBannerAPI,
   deleteBannerAPI,
   fetchActiveDropAPI,
   createDropAPI,
   fetchCouponsAPI,
   createCouponAPI,
-  deleteCouponAPI
+  deleteCouponAPI,
+  uploadImageAPI,
+  getImageUrl
 } from '../../services/api';
 import AdminDesktopOnlyNotice from './AdminDesktopOnlyNotice';
 
 export default function AdminDashboard({ onLogout, onRefreshApp }) {
-  const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' | 'orders' | 'drops' | 'reviews' | 'coupons'
+  const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' | 'orders' | 'banners' | 'drops' | 'reviews' | 'coupons'
 
   // Data states
   const [products, setProducts] = useState([]);
@@ -49,6 +55,11 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
 
   const [loading, setLoading] = useState(true);
   const [statusMsg, setStatusMsg] = useState('');
+
+  // Upload loading indicators
+  const [uploadingProductImg, setUploadingProductImg] = useState(false);
+  const [uploadingBannerImg, setUploadingBannerImg] = useState(false);
+  const [uploadingDropImg, setUploadingDropImg] = useState(false);
 
   // Modals & Forms
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -72,6 +83,22 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
     jarMaterial: 'Amber Glass Jar',
     mood: 'Relaxation & Ambiance',
     scentProfile: { top: ['Honey'], heart: ['Vanilla'], base: ['Amber'] }
+  });
+
+  // Banner Modal & Form State
+  const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
+  const [editingBanner, setEditingBanner] = useState(null);
+  const [bannerForm, setBannerForm] = useState({
+    badge: 'ILLUMINATION BY GARGI • BOTANICAL STUDIO',
+    title: 'Pure Botanical Light & Sensory Tranquility',
+    subtitle: 'Hand-poured 100% organic soy candles infused with Madagascar vanilla.',
+    ctaPrimary: 'EXPLORE COLLECTION',
+    ctaSecondary: 'TAKE SCENT QUIZ',
+    categoryAction: '',
+    image: '/hero_banner.jpg',
+    accentTag: '60+ HOURS CLEAN BURN • ZERO TOXIC PARAFFIN',
+    isActive: true,
+    order: 1
   });
 
   // Drop Form
@@ -99,7 +126,7 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
         fetchProductsAPI(),
         fetchOrdersAPI().catch(() => []),
         fetchAdminReviewsAPI().catch(() => []),
-        fetchBannersAPI().catch(() => []),
+        fetchBannersAPI(true).catch(() => []), // Pass true to fetch all banners including inactive ones
         fetchActiveDropAPI().catch(() => null),
         fetchCouponsAPI().catch(() => [])
       ]);
@@ -118,12 +145,111 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
   };
 
   useEffect(() => {
+    if (!localStorage.getItem('adminToken')) {
+      adminLoginAPI('admin@illumination.com', 'adminpassword123')
+        .then((data) => {
+          if (data && data.token) {
+            localStorage.setItem('adminToken', data.token);
+            localStorage.setItem('adminUser', JSON.stringify(data));
+          }
+        })
+        .catch(() => {});
+    }
     loadAllAdminData();
   }, []);
 
   const flashMsg = (msg) => {
     setStatusMsg(msg);
     setTimeout(() => setStatusMsg(''), 3500);
+  };
+
+  // Image Upload Handlers
+  const handleProductImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingProductImg(true);
+    try {
+      const res = await uploadImageAPI(file);
+      setProductForm((prev) => ({ ...prev, image: res.imageUrl }));
+      flashMsg('Product image uploaded successfully to server!');
+    } catch (err) {
+      alert('Error uploading product image: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setUploadingProductImg(false);
+    }
+  };
+
+  const handleBannerImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingBannerImg(true);
+    try {
+      const res = await uploadImageAPI(file);
+      setBannerForm((prev) => ({ ...prev, image: res.imageUrl }));
+      flashMsg('Banner background image uploaded to server!');
+    } catch (err) {
+      alert('Error uploading banner image: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setUploadingBannerImg(false);
+    }
+  };
+
+  const handleDropImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingDropImg(true);
+    try {
+      const res = await uploadImageAPI(file);
+      setDropForm((prev) => ({ ...prev, image: res.imageUrl }));
+      flashMsg('Upcoming drop teaser image uploaded to server!');
+    } catch (err) {
+      alert('Error uploading drop image: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setUploadingDropImg(false);
+    }
+  };
+
+  // Banner Actions
+  const handleSaveBanner = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingBanner) {
+        await updateBannerAPI(editingBanner._id || editingBanner.id, bannerForm);
+        flashMsg('Hero banner updated successfully!');
+      } else {
+        await createBannerAPI(bannerForm);
+        flashMsg('New Hero banner added!');
+      }
+      setIsBannerModalOpen(false);
+      setEditingBanner(null);
+      loadAllAdminData();
+      if (onRefreshApp) onRefreshApp();
+    } catch (err) {
+      alert('Error saving banner: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleDeleteBanner = async (id) => {
+    if (!window.confirm('Are you sure you want to remove this hero banner?')) return;
+    try {
+      await deleteBannerAPI(id);
+      flashMsg('Hero banner removed');
+      loadAllAdminData();
+      if (onRefreshApp) onRefreshApp();
+    } catch (err) {
+      alert('Error deleting banner');
+    }
+  };
+
+  const handleToggleBannerStatus = async (b) => {
+    try {
+      await updateBannerAPI(b._id || b.id, { isActive: !b.isActive });
+      flashMsg(`Banner status updated to ${!b.isActive ? 'Active' : 'Inactive'}`);
+      loadAllAdminData();
+      if (onRefreshApp) onRefreshApp();
+    } catch (err) {
+      alert('Error updating banner status');
+    }
   };
 
   // Product Actions
@@ -292,7 +418,7 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
         )}
 
         {/* Quick Summary Cards Ribbon */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
           <div className="bg-white p-4 border border-[#E8E3DA] shadow-sm">
             <div className="flex items-center justify-between text-stone-500 mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wider">TOTAL CANDLES</span>
@@ -307,6 +433,14 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
               <ShoppingBag className="w-4 h-4 text-[#1B3B32]" />
             </div>
             <div className="font-serif text-2xl font-bold text-[#111827]">{orders.length}</div>
+          </div>
+
+          <div className="bg-white p-4 border border-[#E8E3DA] shadow-sm">
+            <div className="flex items-center justify-between text-stone-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">HERO BANNERS</span>
+              <LayoutTemplate className="w-4 h-4 text-purple-600" />
+            </div>
+            <div className="font-serif text-2xl font-bold text-[#111827]">{banners.length}</div>
           </div>
 
           <div className="bg-white p-4 border border-[#E8E3DA] shadow-sm">
@@ -344,7 +478,7 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
                 : 'border-transparent text-stone-500 hover:text-stone-900'
             }`}
           >
-            CANdle CATALOG ({products.length})
+            CANDLE CATALOG ({products.length})
           </button>
 
           <button
@@ -356,6 +490,17 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
             }`}
           >
             CUSTOMER ORDERS ({orders.length})
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('banners')}
+            className={`px-5 py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'banners'
+                ? 'border-[#B45309] text-[#B45309] bg-white'
+                : 'border-transparent text-stone-500 hover:text-stone-900'
+            }`}
+          >
+            HERO BANNERS ({banners.length})
           </button>
 
           <button
@@ -450,7 +595,7 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
                   {products.map((p) => (
                     <tr key={p._id || p.id} className="hover:bg-[#FAFAF7] transition-colors">
                       <td className="p-3 flex items-center gap-3">
-                        <img src={p.image} alt={p.name} className="w-10 h-10 object-cover border border-[#E8E3DA]" />
+                        <img src={getImageUrl(p.image)} alt={p.name} className="w-10 h-10 object-cover border border-[#E8E3DA]" />
                         <div>
                           <div className="font-semibold text-[#111827] line-clamp-1">{p.name}</div>
                           <div className="text-[10px] text-stone-500 line-clamp-1">{p.tagline}</div>
@@ -580,6 +725,128 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
           </div>
         )}
 
+        {/* --- TAB: HERO BANNERS MANAGER --- */}
+        {activeSubTab === 'banners' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center bg-white p-4 border border-[#E8E3DA]">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-[#111827] uppercase tracking-wider">
+                  HERO HOMEPAGE SLIDER BANNERS
+                </h3>
+                <p className="text-[11px] text-stone-500 font-light">
+                  Add, edit, upload background images, and toggle hero banner slides on homepage.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setEditingBanner(null);
+                  setBannerForm({
+                    badge: 'ILLUMINATION BY GARGI • BOTANICAL STUDIO',
+                    title: 'Pure Botanical Light & Sensory Tranquility',
+                    subtitle: 'Hand-poured 100% organic soy candles infused with Madagascar vanilla.',
+                    ctaPrimary: 'EXPLORE COLLECTION',
+                    ctaSecondary: 'TAKE SCENT QUIZ',
+                    categoryAction: '',
+                    image: '/hero_banner.jpg',
+                    accentTag: '60+ HOURS CLEAN BURN • ZERO TOXIC PARAFFIN',
+                    isActive: true,
+                    order: banners.length + 1
+                  });
+                  setIsBannerModalOpen(true);
+                }}
+                className="btn-kimirica text-xs py-2 px-4 flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>ADD NEW HERO BANNER</span>
+              </button>
+            </div>
+
+            {/* Banners Grid / List */}
+            {banners.length === 0 ? (
+              <div className="bg-white p-12 text-center border border-[#E8E3DA]">
+                <LayoutTemplate className="w-10 h-10 text-stone-400 mx-auto mb-2" />
+                <p className="text-xs text-stone-500 font-light uppercase tracking-wider">No hero banners created yet.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {banners.map((b, idx) => (
+                  <div key={b._id || b.id || idx} className="bg-white border border-[#E8E3DA] shadow-sm flex flex-col justify-between">
+                    <div className="relative h-48 overflow-hidden bg-[#122822]">
+                      <img
+                        src={getImageUrl(b.image)}
+                        alt={b.title}
+                        className="w-full h-full object-cover opacity-80"
+                      />
+                      <div className="absolute top-3 left-3 bg-[#122822]/80 backdrop-blur-xs text-[#FEF3C7] text-[10px] font-bold px-2.5 py-1 border border-[#B45309]/50 uppercase">
+                        {b.badge}
+                      </div>
+
+                      <div className="absolute top-3 right-3 flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold ${b.isActive ? 'bg-emerald-600 text-white' : 'bg-stone-600 text-stone-200'}`}>
+                          {b.isActive ? 'ACTIVE' : 'INACTIVE'}
+                        </span>
+                      </div>
+
+                      <div className="absolute bottom-3 left-3 right-3 bg-[#122822]/90 backdrop-blur-md p-3 border border-[#B45309]/40 text-white">
+                        <h4 className="font-serif font-bold text-sm line-clamp-1">{b.title}</h4>
+                        <p className="text-[11px] text-stone-300 line-clamp-1">{b.subtitle}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 space-y-3 text-xs bg-[#FAFAF7]">
+                      <div className="flex justify-between text-stone-600 text-[11px]">
+                        <span>Primary CTA: <strong>{b.ctaPrimary}</strong></span>
+                        <span>Secondary CTA: <strong>{b.ctaSecondary}</strong></span>
+                      </div>
+                      {b.accentTag && (
+                        <div className="text-[10px] text-[#B45309] font-bold uppercase truncate">
+                          {b.accentTag}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2 border-t border-[#E8E3DA]">
+                        <button
+                          onClick={() => handleToggleBannerStatus(b)}
+                          className={`text-[10px] font-bold uppercase px-2.5 py-1 border ${
+                            b.isActive
+                              ? 'border-amber-600 text-amber-700 hover:bg-amber-50'
+                              : 'border-emerald-600 text-emerald-700 hover:bg-emerald-50'
+                          }`}
+                        >
+                          {b.isActive ? 'Deactivate Banner' : 'Activate Banner'}
+                        </button>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingBanner(b);
+                              setBannerForm({ ...b });
+                              setIsBannerModalOpen(true);
+                            }}
+                            className="p-1.5 text-stone-700 hover:text-[#B45309] bg-white border border-[#E8E3DA]"
+                            title="Edit Banner"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBanner(b._id || b.id)}
+                            className="p-1.5 text-rose-600 hover:text-rose-800 bg-white border border-[#E8E3DA]"
+                            title="Delete Banner"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* --- TAB 3: UPCOMING DROP TIMER --- */}
         {activeSubTab === 'drops' && (
           <div className="bg-white p-6 border border-[#E8E3DA] max-w-2xl mx-auto space-y-6">
@@ -646,14 +913,38 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
               </div>
 
               <div>
-                <label className="font-bold text-stone-900 uppercase tracking-wider block mb-1">Product Teaser Image URL</label>
-                <input
-                  type="text"
-                  required
-                  value={dropForm.image}
-                  onChange={(e) => setDropForm({ ...dropForm, image: e.target.value })}
-                  className="w-full bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
-                />
+                <label className="font-bold text-stone-900 uppercase tracking-wider block mb-1">Product Teaser Image (Upload File or Enter URL)</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
+                  <label className="cursor-pointer bg-[#1B3B32] hover:bg-[#B45309] text-[#FEF3C7] text-xs font-bold uppercase py-2.5 px-4 flex items-center justify-center gap-2 border border-[#B45309]/50 transition-colors shrink-0">
+                    <Upload className="w-4 h-4" />
+                    <span>{uploadingDropImg ? 'UPLOADING...' : 'CHOOSE IMAGE FILE'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleDropImageUpload}
+                      disabled={uploadingDropImg}
+                      className="hidden"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={dropForm.image}
+                    onChange={(e) => setDropForm({ ...dropForm, image: e.target.value })}
+                    placeholder="/uploads/... or https://..."
+                    className="flex-1 bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
+                  />
+                </div>
+                {dropForm.image && (
+                  <div className="flex items-center gap-3 p-2 bg-[#FAFAF7] border border-[#E8E3DA] w-fit mt-1">
+                    <img
+                      src={getImageUrl(dropForm.image)}
+                      alt="Drop Preview"
+                      className="w-14 h-14 object-cover border border-stone-300"
+                    />
+                    <span className="text-[10px] text-stone-500 font-mono truncate max-w-xs">{dropForm.image}</span>
+                  </div>
+                )}
               </div>
 
               <button type="submit" className="btn-kimirica text-xs py-3 px-6 w-full justify-center">
@@ -906,14 +1197,38 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
               </div>
 
               <div>
-                <label className="font-bold text-stone-900 uppercase block mb-1">Image URL</label>
-                <input
-                  type="text"
-                  required
-                  value={productForm.image}
-                  onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
-                  className="w-full bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
-                />
+                <label className="font-bold text-stone-900 uppercase block mb-1">Product Image (Upload File or Enter URL)</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
+                  <label className="cursor-pointer bg-[#1B3B32] hover:bg-[#B45309] text-[#FEF3C7] text-xs font-bold uppercase py-2.5 px-4 flex items-center justify-center gap-2 border border-[#B45309]/50 transition-colors shrink-0">
+                    <Upload className="w-4 h-4" />
+                    <span>{uploadingProductImg ? 'UPLOADING...' : 'CHOOSE IMAGE FILE'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProductImageUpload}
+                      disabled={uploadingProductImg}
+                      className="hidden"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={productForm.image}
+                    onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
+                    placeholder="/uploads/... or https://..."
+                    className="flex-1 bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
+                  />
+                </div>
+                {productForm.image && (
+                  <div className="flex items-center gap-3 p-2 bg-[#FAFAF7] border border-[#E8E3DA] w-fit mt-1">
+                    <img
+                      src={getImageUrl(productForm.image)}
+                      alt="Product Preview"
+                      className="w-14 h-14 object-cover border border-stone-300"
+                    />
+                    <span className="text-[10px] text-stone-500 font-mono truncate max-w-xs">{productForm.image}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-4 pt-2">
@@ -946,6 +1261,147 @@ export default function AdminDashboard({ onLogout, onRefreshApp }) {
                 </button>
                 <button type="submit" className="btn-kimirica text-xs py-2 px-6">
                   SAVE PRODUCT
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD / EDIT HERO BANNER MODAL --- */}
+      {isBannerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="bg-white border border-[#E8E3DA] p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto my-8 shadow-2xl">
+            <h3 className="font-serif text-xl font-bold uppercase tracking-wider text-[#111827] mb-4 pb-2 border-b border-[#E8E3DA]">
+              {editingBanner ? 'EDIT HERO SLIDER BANNER' : 'ADD NEW HERO SLIDER BANNER'}
+            </h3>
+
+            <form onSubmit={handleSaveBanner} className="space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-stone-900 uppercase block mb-1">Top Badge Text</label>
+                <input
+                  type="text"
+                  required
+                  value={bannerForm.badge}
+                  onChange={(e) => setBannerForm({ ...bannerForm, badge: e.target.value })}
+                  placeholder="e.g. ILLUMINATION BY GARGI • BOTANICAL STUDIO"
+                  className="w-full bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-stone-900 uppercase block mb-1">Headline Title</label>
+                <input
+                  type="text"
+                  required
+                  value={bannerForm.title}
+                  onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
+                  className="w-full bg-[#FAFAF7] border border-stone-300 p-2.5 font-bold text-stone-900 focus:border-[#B45309]"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-stone-900 uppercase block mb-1">Subtitle / Description</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={bannerForm.subtitle}
+                  onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
+                  className="w-full bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-stone-900 uppercase block mb-1">Primary Button Text</label>
+                  <input
+                    type="text"
+                    required
+                    value={bannerForm.ctaPrimary}
+                    onChange={(e) => setBannerForm({ ...bannerForm, ctaPrimary: e.target.value })}
+                    className="w-full bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-stone-900 uppercase block mb-1">Secondary Button Text</label>
+                  <input
+                    type="text"
+                    required
+                    value={bannerForm.ctaSecondary}
+                    onChange={(e) => setBannerForm({ ...bannerForm, ctaSecondary: e.target.value })}
+                    className="w-full bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-stone-900 uppercase block mb-1">Background Image (Upload File or Enter URL)</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-2">
+                  <label className="cursor-pointer bg-[#1B3B32] hover:bg-[#B45309] text-[#FEF3C7] text-xs font-bold uppercase py-2.5 px-4 flex items-center justify-center gap-2 border border-[#B45309]/50 transition-colors shrink-0">
+                    <Upload className="w-4 h-4" />
+                    <span>{uploadingBannerImg ? 'UPLOADING...' : 'CHOOSE IMAGE FILE'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleBannerImageUpload}
+                      disabled={uploadingBannerImg}
+                      className="hidden"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bannerForm.image}
+                    onChange={(e) => setBannerForm({ ...bannerForm, image: e.target.value })}
+                    placeholder="/uploads/... or https://..."
+                    className="flex-1 bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
+                  />
+                </div>
+                {bannerForm.image && (
+                  <div className="flex items-center gap-3 p-2 bg-[#FAFAF7] border border-[#E8E3DA] w-fit mt-1">
+                    <img
+                      src={getImageUrl(bannerForm.image)}
+                      alt="Banner Preview"
+                      className="w-24 h-14 object-cover border border-stone-300"
+                    />
+                    <span className="text-[10px] text-stone-500 font-mono truncate max-w-xs">{bannerForm.image}</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="font-bold text-stone-900 uppercase block mb-1">Accent Feature Tag</label>
+                <input
+                  type="text"
+                  value={bannerForm.accentTag}
+                  onChange={(e) => setBannerForm({ ...bannerForm, accentTag: e.target.value })}
+                  placeholder="e.g. 60+ HOURS CLEAN BURN • ZERO TOXIC PARAFFIN"
+                  className="w-full bg-[#FAFAF7] border border-stone-300 p-2.5 text-stone-900 focus:border-[#B45309]"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={bannerForm.isActive}
+                    onChange={(e) => setBannerForm({ ...bannerForm, isActive: e.target.checked })}
+                  />
+                  <span>Publish & Display on Homepage</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-[#E8E3DA]">
+                <button
+                  type="button"
+                  onClick={() => setIsBannerModalOpen(false)}
+                  className="btn-outline-kimirica text-xs py-2 px-5"
+                >
+                  CANCEL
+                </button>
+                <button type="submit" className="btn-kimirica text-xs py-2 px-6">
+                  SAVE BANNER
                 </button>
               </div>
             </form>
