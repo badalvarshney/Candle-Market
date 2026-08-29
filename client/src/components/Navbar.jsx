@@ -29,7 +29,7 @@ export default function Navbar({
       {/* Top Announcement Ribbon */}
       <div className="bg-[#1B3B32] text-[#FEF3C7] text-[10px] sm:text-[11px] font-bold py-1.5 px-3 sm:px-4 text-center tracking-widest uppercase flex items-center justify-center gap-1.5 border-b border-[#B45309]/40">
         <Flame className="w-3.5 h-3.5 text-[#FEF3C7] shrink-0" />
-        <span className="truncate">FREE SHIPPING OVER ₹999 | CODE: <strong className="text-[#FEF3C7] underline">ILLUMINATE10</strong></span>
+        <span className="truncate">FREE EXPRESS SHIPPING OVER ₹4999 • BOTANICAL HAND-POURED CANDLES</span>
       </div>
 
       {/* Main Navbar */}

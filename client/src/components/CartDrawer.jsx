@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { X, Trash2, ShoppingBag, ArrowRight, Flame, Tag, ShieldCheck, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Trash2, ShoppingBag, ArrowRight, Flame, Tag, ShieldCheck, Check, MapPin } from 'lucide-react';
+import { calculateDeliveryCharge } from '../utils/deliveryCalculator';
 
 export default function CartDrawer({
   isOpen,
@@ -14,26 +15,63 @@ export default function CartDrawer({
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponError, setCouponError] = useState('');
 
+  // Auto-reset coupon states whenever cart drawer is closed or re-opened
+  useEffect(() => {
+    if (!isOpen) {
+      setCouponCode('');
+      setDiscountPercent(0);
+      setCouponApplied(false);
+      setCouponError('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const freeShippingThreshold = 999;
+  const freeShippingThreshold = 4999;
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const discountAmount = Math.round((subtotal * discountPercent) / 100);
-  const shippingCost = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : 99;
+
+  // Enforce ₹999 coupon limit and ₹2000+ flat ₹200 discount rule
+  const isCouponEligible = subtotal >= 999;
+  let discountAmount = 0;
+  if (couponApplied && isCouponEligible) {
+    if (subtotal >= 2000) {
+      discountAmount = 200; // Flat ₹200 OFF for orders ₹2000+
+    } else {
+      discountAmount = Math.round((subtotal * discountPercent) / 100);
+    }
+  }
+
+  // Calculate dynamic delivery fee (Minimum ₹40 base fee unless subtotal >= 4999)
+  const deliveryCalc = calculateDeliveryCharge(subtotal, {});
+  const shippingCost = deliveryCalc.fee;
   const finalTotal = Math.max(0, subtotal - discountAmount + shippingCost);
 
   const shippingProgress = Math.min(100, (subtotal / freeShippingThreshold) * 100);
 
   const handleApplyCoupon = (e) => {
     e.preventDefault();
-    const code = couponCode.toUpperCase();
+    const code = couponCode.toUpperCase().trim();
+    if (!isCouponEligible) {
+      setCouponError('Minimum order of ₹999 required to use coupon code!');
+      setDiscountPercent(0);
+      setCouponApplied(false);
+      return;
+    }
+
     if (code === 'ILLUMINATE10' || code === 'KIMIRICA10' || code === 'CANDLE10') {
       setDiscountPercent(10);
       setCouponApplied(true);
       setCouponError('');
     } else {
-      setCouponError('Invalid coupon code. Try ILLUMINATE10 for 10% off!');
+      setCouponError('Invalid promo coupon code!');
     }
+  };
+
+  const handleRemoveCoupon = () => {
+    setDiscountPercent(0);
+    setCouponApplied(false);
+    setCouponCode('');
+    setCouponError('');
   };
 
   return (
@@ -152,10 +190,13 @@ export default function CartDrawer({
                   <Tag className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                   <input
                     type="text"
-                    placeholder="PROMO CODE (ILLUMINATE10)"
+                    placeholder="ENTER PROMO CODE"
                     value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    className="w-full pl-9 pr-2 py-2 text-xs bg-white border border-[#111827] focus:outline-none focus:border-[#B45309] uppercase tracking-wider font-semibold"
+                    onChange={(e) => {
+                      setCouponCode(e.target.value);
+                      setCouponError('');
+                    }}
+                    className="w-full pl-9 pr-2 py-2 text-xs bg-white border border-[#111827] focus:outline-none focus:border-[#B45309] uppercase tracking-wider font-semibold placeholder:normal-case placeholder:font-normal"
                   />
                 </div>
                 <button
@@ -167,15 +208,31 @@ export default function CartDrawer({
               </form>
 
               {couponApplied && (
-                <div className="text-[10px] text-[#1B3B32] font-semibold flex items-center gap-1 bg-[#F9F5F0] p-2 border border-[#E8E3DA] uppercase tracking-wider">
-                  <Check className="w-3.5 h-3.5 text-[#B45309]" />
-                  <span>PROMO CODE ILLUMINATE10 APPLIED (10% OFF)!</span>
+                <div className="text-[10px] text-[#1B3B32] font-semibold flex items-center justify-between bg-[#F9F5F0] p-2 border border-[#E8E3DA] uppercase tracking-wider">
+                  <div className="flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-[#B45309]" />
+                    <span>PROMO COUPON APPLIED ({subtotal >= 2000 ? 'FLAT ₹200 OFF' : '10% OFF'})!</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-rose-600 hover:text-rose-800 font-bold underline text-[10px] lowercase tracking-normal cursor-pointer ml-2"
+                  >
+                    remove
+                  </button>
                 </div>
               )}
 
-              {couponError && (
-                <div className="text-[10px] text-rose-600 font-semibold uppercase tracking-wider">
-                  {couponError}
+              {couponError && couponCode.trim() !== '' && (
+                <div className="text-[10px] text-rose-600 font-semibold uppercase tracking-wider flex items-center justify-between">
+                  <span>{couponError}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setCouponCode(''); setCouponError(''); }}
+                    className="text-stone-400 hover:text-stone-700 text-[10px] underline lowercase cursor-pointer"
+                  >
+                    clear
+                  </button>
                 </div>
               )}
 
@@ -187,13 +244,16 @@ export default function CartDrawer({
 
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-[#1B3B32]">
-                    <span className="uppercase tracking-wider">Discount (10%)</span>
+                    <span className="uppercase tracking-wider">Discount {subtotal >= 2000 ? '(Flat ₹200)' : '(10%)'}</span>
                     <span>-₹{discountAmount}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between">
-                  <span className="uppercase tracking-wider">Shipping</span>
+                <div className="flex justify-between items-center">
+                  <span className="uppercase tracking-wider flex items-center gap-1">
+                    <span>Shipping Fee</span>
+                    {shippingCost > 0 && <span className="text-[9px] text-[#B45309] font-normal lowercase">(location based, min ₹100)</span>}
+                  </span>
                   <span>{shippingCost === 0 ? <strong className="text-[#1B3B32] uppercase">FREE</strong> : `₹${shippingCost}`}</span>
                 </div>
 

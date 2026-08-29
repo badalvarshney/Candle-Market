@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { X, CheckCircle2, ShieldCheck, Truck, CreditCard, Flame, Ticket } from 'lucide-react';
+import { X, CheckCircle2, ShieldCheck, Truck, CreditCard, Flame, Ticket, MapPin } from 'lucide-react';
 import { placeOrderAPI, validateCouponAPI } from '../services/api';
+import { calculateDeliveryCharge } from '../utils/deliveryCalculator';
 
 export default function CheckoutModal({
   isOpen,
@@ -29,9 +30,31 @@ export default function CheckoutModal({
   const [couponError, setCouponError] = useState('');
   const [couponSuccessMsg, setCouponSuccessMsg] = useState('');
 
+  // Auto-reset coupon states when checkout modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setCouponCode('');
+      setCouponDiscount(0);
+      setCouponError('');
+      setCouponSuccessMsg('');
+      setStep(1);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const currentFinalTotal = Math.max(0, pricing.finalTotal - couponDiscount);
+  // Calculate live delivery charge based on user's entered city & pincode
+  const deliveryCalc = calculateDeliveryCharge(pricing.subtotal || 0, {
+    city: formData.city,
+    pincode: formData.pincode,
+    address: formData.address
+  });
+
+  const liveShippingCost = deliveryCalc.fee;
+  const currentSubtotal = pricing.subtotal || 0;
+  const initialDiscount = pricing.discountAmount || 0;
+  const totalDiscount = initialDiscount + couponDiscount;
+  const currentFinalTotal = Math.max(0, currentSubtotal - totalDiscount + liveShippingCost);
 
   const handleSubmitShipping = (e) => {
     e.preventDefault();
@@ -41,13 +64,26 @@ export default function CheckoutModal({
   const handleApplyCoupon = async () => {
     setCouponError('');
     setCouponSuccessMsg('');
+
+    if (currentSubtotal < 999) {
+      setCouponError('Minimum order of ₹999 required to use coupon code!');
+      return;
+    }
+
     try {
-      const data = await validateCouponAPI(couponCode, pricing.subtotal);
+      const data = await validateCouponAPI(couponCode, currentSubtotal);
       setCouponDiscount(data.discountAmount);
       setCouponSuccessMsg(`Coupon ${data.code} applied! Saved ₹${data.discountAmount}`);
     } catch (err) {
       setCouponError(err.response?.data?.message || 'Invalid coupon code');
     }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode('');
+    setCouponDiscount(0);
+    setCouponError('');
+    setCouponSuccessMsg('');
   };
 
   const handlePlaceOrder = async () => {
@@ -65,9 +101,9 @@ export default function CheckoutModal({
         })),
         paymentMethod,
         pricing: {
-          subtotal: pricing.subtotal,
-          discountAmount: pricing.discountAmount + couponDiscount,
-          shippingCost: pricing.shippingCost,
+          subtotal: currentSubtotal,
+          discountAmount: totalDiscount,
+          shippingCost: liveShippingCost,
           finalTotal: currentFinalTotal
         }
       };
@@ -180,15 +216,22 @@ export default function CheckoutModal({
             <div className="pt-2 border-t border-[#E8E3DA]">
               <label className="font-bold text-stone-700 uppercase tracking-wider block mb-1 flex items-center gap-1">
                 <Ticket className="w-3.5 h-3.5 text-[#B45309]" />
-                <span>HAVE A PROMO COUPON CODE? (e.g. WELCOME10)</span>
+                <span>HAVE A PROMO COUPON CODE?</span>
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="WELCOME10"
-                  className="flex-1 bg-[#FAFAF7] border border-stone-300 p-2 font-mono font-bold text-stone-900 uppercase focus:outline-none"
+                  onChange={(e) => {
+                    setCouponCode(e.target.value.toUpperCase());
+                    setCouponError('');
+                    if (!e.target.value.trim()) {
+                      setCouponSuccessMsg('');
+                      setCouponDiscount(0);
+                    }
+                  }}
+                  placeholder="ENTER COUPON CODE"
+                  className="flex-1 bg-[#FAFAF7] border border-stone-300 p-2 font-mono font-bold text-stone-900 uppercase focus:outline-none placeholder:font-sans placeholder:font-normal placeholder:normal-case text-xs"
                 />
                 <button
                   type="button"
@@ -198,11 +241,45 @@ export default function CheckoutModal({
                   APPLY
                 </button>
               </div>
-              {couponSuccessMsg && <p className="text-emerald-700 font-bold text-[10px] mt-1">{couponSuccessMsg}</p>}
-              {couponError && <p className="text-rose-600 font-bold text-[10px] mt-1">{couponError}</p>}
+
+              {couponSuccessMsg && (
+                <div className="flex items-center justify-between mt-2 bg-emerald-50 p-2 border border-emerald-200 text-[10px]">
+                  <p className="text-emerald-800 font-bold">{couponSuccessMsg}</p>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-rose-600 hover:text-rose-800 font-bold underline lowercase cursor-pointer ml-2"
+                  >
+                    remove
+                  </button>
+                </div>
+              )}
+
+              {couponError && couponCode.trim() !== '' && (
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-rose-600 font-bold text-[10px]">{couponError}</p>
+                  <button
+                    type="button"
+                    onClick={() => { setCouponCode(''); setCouponError(''); }}
+                    className="text-stone-400 hover:text-stone-700 text-[10px] underline lowercase cursor-pointer"
+                  >
+                    clear
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="bg-[#F9F5F0] p-4 border border-[#E8E3DA] text-[#111827] flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mt-6">
+            <div className="bg-[#FAFAF7] p-3 border border-[#E8E3DA] flex items-center justify-between text-xs mt-4">
+              <div className="flex items-center gap-1.5 text-[#1B3B32] font-semibold">
+                <MapPin className="w-3.5 h-3.5 text-[#B45309]" />
+                <span>Shipping Zone: <strong className="text-[#111827]">{deliveryCalc.zoneName}</strong></span>
+              </div>
+              <span className="font-bold text-[#B45309]">
+                {deliveryCalc.isFree ? 'FREE' : `₹${liveShippingCost}`}
+              </span>
+            </div>
+
+            <div className="bg-[#F9F5F0] p-4 border border-[#E8E3DA] text-[#111827] flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mt-3">
               <div>
                 <span className="text-[10px] text-[#6B7280] font-bold uppercase tracking-widest block">Total Payable</span>
                 <span className="text-xl font-bold text-[#111827]">₹{currentFinalTotal}</span>

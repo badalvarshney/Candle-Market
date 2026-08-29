@@ -16,7 +16,7 @@ export default function AdminDesktopOnlyNotice({ onGoHome }) {
 
   return (
     <div className="min-h-screen bg-[#122822] text-[#FEF3C7] flex flex-col items-center justify-center p-6 text-center relative overflow-hidden font-sans">
-      
+
       {/* Background Radial Aura */}
       <div className="absolute w-[500px] h-[500px] bg-[#B45309]/20 rounded-full blur-3xl animate-pulse pointer-events-none" />
 
@@ -34,7 +34,7 @@ export default function AdminDesktopOnlyNotice({ onGoHome }) {
 
       {/* Main Notice Card */}
       <div className="relative z-10 max-w-lg w-full bg-[#1B3B32] border-2 border-[#B45309] p-6 sm:p-10 shadow-2xl space-y-6 animate-fade-in">
-        
+
         {/* Animated Laptop Icon with Ring */}
         <div className="relative mx-auto w-20 h-20 flex items-center justify-center">
           <div className="absolute inset-0 bg-[#B45309]/40 rounded-full blur-xl animate-pulse" />

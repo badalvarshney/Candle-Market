@@ -35,7 +35,12 @@ export const validateCoupon = async (req, res, next) => {
       throw new Error(`Minimum purchase amount of ₹${coupon.minPurchase} required for this coupon`);
     }
 
-    const discount = Math.min((amount * coupon.discountPercent) / 100, coupon.maxDiscount);
+    let discount = 0;
+    if (amount >= 2000) {
+      discount = 200;
+    } else {
+      discount = Math.min((amount * coupon.discountPercent) / 100, coupon.maxDiscount);
+    }
 
     return res.status(200).json({
       success: true,
